@@ -89,5 +89,39 @@
     $('searchBtn').onclick = search;
     $('statsBtn').onclick  = stats;
     health();
+    document.getElementById('seedBtn') health();health(); (document.getElementById('seedBtn').onclick = seed);
   });
 })();
+async function seed(){
+  try{
+    const now = new Date();
+    const start = new Date(now.getTime() + 60*60*1000);      // +1h
+    const end   = new Date(start.getTime() + 6*60*60*1000);   // +6h
+    const payload = {
+      origin:{lat:-17.8249,lng:31.0530,name:'Harare'},
+      destination:{lat:-20.1596,lng:28.6040,name:'Bulawayo'},
+      startTime:start.toISOString(),
+      endTime:end.toISOString(),
+      seats:12, price:25, allow_parcels:true,
+      driver_name:'Tinashe', driver_phone:'+263771234567'
+    };
+    const r = await (await fetch(location.origin + '/api/journeys', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    })).json();
+
+    // make sure current filters match the seeded journey
+    document.getElementById('o_lat').value = '-17.8249';
+    document.getElementById('o_lng').value = '31.0530';
+    document.getElementById('d_lat').value = '-20.1596';
+    document.getElementById('d_lng').value = '28.6040';
+    document.getElementById('start').value = start.toISOString();
+    document.getElementById('end').value   = end.toISOString();
+
+    // surface result then search
+    (document.getElementById('log').textContent = JSON.stringify(r));
+    await (typeof search === 'function' ? search() : Promise.resolve());
+  }catch(e){
+    (document.getElementById('log').textContent = JSON.stringify(e));
+  }
+}
