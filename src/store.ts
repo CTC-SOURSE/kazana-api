@@ -7,14 +7,15 @@ const journeys: Journey[] = [];
 const bookings: Booking[] = [];
 const packages: PackageBooking[] = [];
 
+// simple id
 const uuid = () =>
   (globalThis as any).crypto?.randomUUID?.() ||
   Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 const nowISO = () => new Date().toISOString();
 
-export const maskPhone = (p?: string) =>
-  !p ? p : p.replace(/\d(?=\d{4})/g, '*');
+// FIX: always return string
+export const maskPhone = (p: string): string => p.replace(/\d(?=\d{4})/g, '*');
 
 export function safeJourney(j: Journey): Journey {
   return { ...j, driver_phone: maskPhone(j.driver_phone) };
@@ -32,9 +33,7 @@ export function addJourney(data: Omit<Journey,'id'|'cancelled'|'reservedSeats'|'
   return j;
 }
 
-export function findJourney(id: string) {
-  return journeys.find(j => j.id === id);
-}
+export const findJourney = (id: string) => journeys.find(j => j.id === id) || null;
 
 export function cancelJourney(id: string) {
   const j = findJourney(id);
@@ -74,7 +73,10 @@ export function cancelBooking(id: string) {
   return b;
 }
 
-export function addPackageBooking(journey_id: string, payload: Omit<PackageBooking,'id'|'status'|'createdAt'|'expiresAt'|'journey_id'>) {
+export function addPackageBooking(
+  journey_id: string,
+  payload: Omit<PackageBooking,'id'|'status'|'createdAt'|'expiresAt'|'journey_id'>
+) {
   sweepExpired();
   const j = findJourney(journey_id);
   if (!j || j.cancelled) throw new Error('journey_not_found');
@@ -83,7 +85,7 @@ export function addPackageBooking(journey_id: string, payload: Omit<PackageBooki
   const activeForJourney = packages.filter(
     p => p.journey_id === journey_id &&
          p.status === 'hold' &&
-         new Date(p.expiresAt).getTime() > Date.now()
+         Date.parse(p.expiresAt) > Date.now()
   ).length;
   if (activeForJourney >= MAX_PARCELS_PER_JOURNEY) throw new Error('no_parcel_capacity');
 
@@ -131,7 +133,7 @@ export function stats() {
   const activeJourneys = journeys.filter(j => !j.cancelled).length;
   const totalBookings  = bookings.length;
   const totalPackages  = packages.length;
-  const successRate    = 0; // mock
+  const successRate    = 0;
   return { activeJourneys, totalBookings, totalPackages, successRate };
 }
 
@@ -151,5 +153,4 @@ export function sweepExpired() {
   }
 }
 
-// expose raw arrays for admin/testing if needed (not exported by default)
 export const __memory = { journeys, bookings, packages };
