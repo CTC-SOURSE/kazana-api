@@ -24,6 +24,10 @@ app.use(rateLimit({ windowMs: 60_000, max: 100, standardHeaders: true, legacyHea
 app.use(cors());
 app.use(express.json({ limit: '200kb' }));
 
+// prevent noisy 404s from browsers requesting /favicon.ico
+app.get("/favicon.ico", (_req, res) => res.status(204).end());
+
+
 app.use("/embed", express.static("public/embed", { maxAge: "1h" }));
 
 
