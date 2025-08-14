@@ -1,121 +1,180 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
 import {
-  createBookingHold,
-  createJourney,
-  searchJourneys,
-  cancelBooking,
-  cancelJourney,
-  getStats,
-  sweepExpiredHolds,
-  findJourney,
-  store
-} from "./store";
-import { Journey } from "./types";
+  addBooking, cancelBooking, addJourney, cancelJourney,
+  searchJourneys, stats, safeJourney, addPackageBooking, cancelPackage,
+  sweepExpired
+} from './store';
+import { Lang } from './types';
 
 dotenv.config();
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '200kb' }));
 
-// Health
-app.get("/health", (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+// ---- i18n (en, sn, nd) ----
+const messages: Record<Lang, Record<string, string>> = {
+  en: {
+    invalid_request: 'invalid request',
+    journey_created: 'journey created',
+    journey_cancelled: 'journey cancelled',
+    journey_not_found: 'Journey not found',
+    seats_min_1: 'seats must be at least 1',
+    not_enough_seats: 'Not enough seats available',
+    booking_created: 'booking placed on 10-min hold',
+    booking_cancelled: 'booking cancelled',
+    parcels_not_allowed: 'Parcels not allowed on this journey',
+    parcel_created: 'package placed on 10-min hold',
+    parcel_cancelled: 'package cancelled',
+    no_parcel_capacity: 'No parcel capacity left for this journey',
+  },
+  sn: {
+    invalid_request: 'chikumbiro chisiri pamutemo',
+    journey_created: 'rwendo rwagadzirwa',
+    journey_cancelled: 'rwendo rwabviswa',
+    journey_not_found: 'Rwendo haruwanikwi',
+    seats_min_1: 'nzvimbo dzinofanira kuva dzinenge 1',
+    not_enough_seats: 'nzvimbo hadzina kukwana',
+    booking_created: 'booking yaiswa pa-hold kwemaminitsi gumi',
+    booking_cancelled: 'booking yabviswa',
+    parcels_not_allowed: 'Mapakeji haabvumidzwe parwendo urwu',
+    parcel_created: 'package yaiswa pa-hold kwemaminitsi gumi',
+    parcel_cancelled: 'package yabviswa',
+    no_parcel_capacity: 'hapana nzvimbo yesarudzo yemapakeji yasara',
+  },
+  nd: {
+    invalid_request: 'isikhalazo esingavunyelwayo',
+    journey_created: 'uhambo lwenziwe',
+    journey_cancelled: 'uhambo lukhanselwe',
+    journey_not_found: 'Uhambo alutholakali',
+    seats_min_1: 'izihlalo okungenani kube yi-1',
+    not_enough_seats: 'izihlalo azanele',
+    booking_created: 'ibhukhi lifakwe ku-hold yemizuzu eyi-10',
+    booking_cancelled: 'ibhukhi likhanseliwe',
+    parcels_not_allowed: 'Imipakethe ayivunyelwanga kulolu hambo',
+    parcel_created: 'ipakethe ifakwe ku-hold yemizuzu eyi-10',
+    parcel_cancelled: 'ipakethe ikhanseliwe',
+    no_parcel_capacity: 'akusekho indawo yemipakethe kulolu hambo',
+  },
+};
 
-// POST /api/journeys
-app.post("/api/journeys", (req, res) => {
-  const b = req.body ?? {};
-  // Light validation (manual)
-  const required = ["origin","destination","startTime","endTime","seats","price","allow_parcels","driver_name","driver_phone"];
-  for (const k of required) if (b[k] === undefined) return res.status(400).json({ error: `Missing: ${k}` });
+const pickLang = (req: express.Request): Lang => {
+  const q = (req.query.lang as string | undefined)?.toLowerCase();
+  const h = req.headers['accept-language']?.toString().slice(0,2).toLowerCase();
+  const cand = (q || h || 'en') as Lang;
+  return (['en','sn','nd'] as Lang[]).includes(cand) ? cand : 'en';
+};
+const t = (lang: Lang, key: string) => messages[lang][key] || messages.en[key] || key;
 
-  const okLoc = (v: any) => v && typeof v.lat === "number" && typeof v.lng === "number" && typeof v.name === "string";
-  if (!okLoc(b.origin) || !okLoc(b.destination)) return res.status(400).json({ error: "Invalid origin/destination" });
-  if (isNaN(Date.parse(b.startTime)) || isNaN(Date.parse(b.endTime))) return res.status(400).json({ error: "Invalid times" });
-  if (typeof b.seats !== "number" || b.seats <= 0) return res.status(400).json({ error: "Invalid seats" });
-  if (typeof b.price !== "number" || b.price < 0) return res.status(400).json({ error: "Invalid price" });
-  if (typeof b.allow_parcels !== "boolean") return res.status(400).json({ error: "Invalid allow_parcels" });
-  if (typeof b.driver_name !== "string" || typeof b.driver_phone !== "string") return res.status(400).json({ error: "Invalid driver fields" });
+// background expiry sweeper (doesn’t block exit)
+setInterval(() => sweepExpired(), 30_000).unref();
 
-  const j = createJourney({
-    origin: b.origin,
-    destination: b.destination,
-    startTime: b.startTime,
-    endTime: b.endTime,
-    seats: b.seats,
-    price: b.price,
-    allow_parcels: b.allow_parcels,
-    driver_name: b.driver_name,
-    driver_phone: b.driver_phone
+app.get('/health', (_req, res) => {
+  res.json({ ok: true, time: new Date().toISOString() });
+});
+
+// ---- Journeys ----
+app.post('/api/journeys', (req, res) => {
+  const lang = pickLang(req);
+  try {
+    const {
+      origin, destination, startTime, endTime,
+      seats, price, allow_parcels, driver_name, driver_phone
+    } = req.body || {};
+    if (!origin || !destination || !startTime || !endTime ||
+        typeof seats !== 'number' || typeof price !== 'number' ||
+        !driver_name || !driver_phone) {
+      return res.status(400).json({ ok: false, error: t(lang,'invalid_request') });
+    }
+    const j = addJourney({
+      origin, destination, startTime, endTime,
+      seats, price, allow_parcels: !!allow_parcels,
+      driver_name, driver_phone
+    });
+    res.status(201).json({ ok: true, message: t(lang,'journey_created'), journey: safeJourney(j) });
+  } catch (e) {
+    res.status(400).json({ ok: false, error: t(lang,'invalid_request') });
+  }
+});
+
+app.get('/api/search', (req, res) => {
+  const lang = pickLang(req); // not heavily used, kept for consistency
+  const { o_lat, o_lng, d_lat, d_lng, start, end, parcel } = req.query as any;
+  const required = [o_lat,o_lng,d_lat,d_lng,start,end].every(Boolean);
+  if (!required) return res.status(400).json({ ok:false, error: t(lang,'invalid_request') });
+  const data = searchJourneys({
+    o_lat: Number(o_lat), o_lng: Number(o_lng),
+    d_lat: Number(d_lat), d_lng: Number(d_lng),
+    start: String(start), end: String(end),
+    parcel: parcel === 'true',
   });
-
-  // Return masked phone
-  const result = searchJourneys({
-    o_lat: j.origin.lat, o_lng: j.origin.lng,
-    d_lat: j.destination.lat, d_lng: j.destination.lng,
-    start: Date.parse(j.startTime), end: Date.parse(j.endTime)
-  }).find(x => x.id === j.id) || j;
-
-  return res.status(201).json(result);
+  res.json({ ok: true, count: data.length, journeys: data });
 });
 
-// GET /api/search
-app.get("/api/search", (req, res) => {
-  const q = req.query;
-  const required = ["o_lat","o_lng","d_lat","d_lng","start","end"];
-  for (const k of required) if (!(k in q)) return res.status(400).json({ error: `Missing query: ${k}` });
+// ---- Bookings ----
+app.post('/api/bookings', (req, res) => {
+  const lang = pickLang(req);
+  try {
+    const { journey_id, rider_name, seats } = req.body || {};
+    if (!journey_id || !rider_name || typeof seats !== 'number')
+      return res.status(400).json({ ok:false, error: t(lang,'invalid_request') });
 
-  const o_lat = Number(q.o_lat), o_lng = Number(q.o_lng);
-  const d_lat = Number(q.d_lat), d_lng = Number(q.d_lng);
-  const start = Date.parse(String(q.start));
-  const end = Date.parse(String(q.end));
-  if ([o_lat,o_lng,d_lat,d_lng].some(Number.isNaN) || isNaN(start) || isNaN(end)) {
-    return res.status(400).json({ error: "Invalid numeric/time parameters" });
+    const booking = addBooking(journey_id, rider_name, seats);
+    res.status(201).json({ ok:true, message: t(lang,'booking_created'), booking, hold_minutes: 10 });
+  } catch (err: any) {
+    const code = String(err.message || '');
+    const map: Record<string, number> = {
+      journey_not_found: 404, seats_min_1: 400, not_enough_seats: 409,
+    };
+    res.status(map[code] || 400).json({ ok:false, code, error: t(lang, code || 'invalid_request') });
   }
-  const parcel = (typeof q.parcel === "string") ? ["1","true","yes"].includes(String(q.parcel).toLowerCase()) : undefined;
-
-  const results = searchJourneys({ o_lat, o_lng, d_lat, d_lng, start, end, parcel });
-  return res.json({ results, count: results.length });
 });
 
-// POST /api/bookings
-app.post("/api/bookings", (req, res) => {
-  const { journey_id, rider_name, seats } = req.body ?? {};
-  if (!journey_id || typeof rider_name !== "string" || typeof seats !== "number") {
-    return res.status(400).json({ error: "journey_id (string), rider_name (string), seats (number) required" });
-  }
-  const j = findJourney(journey_id);
-  if (!j || j.cancelled) return res.status(404).json({ error: "Journey not found" });
-
-  const b = createBookingHold(journey_id, rider_name, seats);
-  if (!b) return res.status(400).json({ error: "Insufficient seats or invalid request" });
-
-  return res.status(201).json({ booking: b, hold_minutes: 10 });
-});
-
-// DELETE /api/bookings/:id/cancel
-app.delete("/api/bookings/:id/cancel", (req, res) => {
+app.delete('/api/bookings/:id/cancel', (req, res) => {
+  const lang = pickLang(req);
   const b = cancelBooking(req.params.id);
-  if (!b) return res.status(404).json({ error: "Booking not found" });
-  return res.json({ booking: b });
+  if (!b) return res.status(404).json({ ok:false, error: t(lang,'invalid_request') });
+  res.json({ ok:true, message: t(lang,'booking_cancelled'), booking: b });
 });
 
-// DELETE /api/journeys/:id
-app.delete("/api/journeys/:id", (req, res) => {
+// ---- Packages (Parcels) ----
+app.post('/api/packages', (req, res) => {
+  const lang = pickLang(req);
+  try {
+    const { journey_id, sender_name, recipient_name, phone, description, weight_kg } = req.body || {};
+    if (!journey_id || !sender_name)
+      return res.status(400).json({ ok:false, error: t(lang,'invalid_request') });
+
+    const pkg = addPackageBooking(journey_id, { sender_name, recipient_name, phone, description, weight_kg });
+    res.status(201).json({ ok:true, message: t(lang,'parcel_created'), package: pkg, hold_minutes: 10 });
+  } catch (err: any) {
+    const code = String(err.message || '');
+    const map: Record<string, number> = {
+      journey_not_found: 404, parcels_not_allowed: 403, no_parcel_capacity: 409
+    };
+    res.status(map[code] || 400).json({ ok:false, code, error: t(lang, code || 'invalid_request') });
+  }
+});
+
+app.delete('/api/packages/:id/cancel', (req, res) => {
+  const lang = pickLang(req);
+  const p = cancelPackage(req.params.id);
+  if (!p) return res.status(404).json({ ok:false, error: t(lang,'invalid_request') });
+  res.json({ ok:true, message: t(lang,'parcel_cancelled'), package: p });
+});
+
+// ---- Driver cancel ----
+app.delete('/api/journeys/:id', (req, res) => {
+  const lang = pickLang(req);
   const j = cancelJourney(req.params.id);
-  if (!j) return res.status(404).json({ error: "Journey not found" });
-  return res.json({ journey: { ...j, driver_phone: "****" } });
+  if (!j) return res.status(404).json({ ok:false, error: t(lang,'journey_not_found') });
+  res.json({ ok:true, message: t(lang,'journey_cancelled'), journey: safeJourney(j) });
 });
 
-// GET /api/admin/stats
-app.get("/api/admin/stats", (_req, res) => {
-  const s = getStats();
-  return res.json(s);
-});
-
-// Sweep expired holds periodically
-setInterval(sweepExpiredHolds, 60 * 1000);
+// ---- Admin ----
+app.get('/api/admin/stats', (_req, res) => res.json({ ok:true, ...stats() }));
 
 const PORT = Number(process.env.PORT || 5000);
 app.listen(PORT, () => {

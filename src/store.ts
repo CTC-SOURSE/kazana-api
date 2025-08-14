@@ -1,37 +1,32 @@
-import { Booking, Journey } from "./types";
-import { randomUUID } from "crypto";
+import { Booking, Journey, PackageBooking } from './types';
+
+const HOLD_MINUTES = 10;
+const MAX_PARCELS_PER_JOURNEY = Number(process.env.MAX_PARCELS_PER_JOURNEY || 20);
 
 const journeys: Journey[] = [];
 const bookings: Booking[] = [];
+const packages: PackageBooking[] = [];
 
-const HOLD_MINUTES = 10;
-const ORIGIN_DEST_MATCH_KM = 50; // simple proximity
-const KM = 1000;
+const uuid = () =>
+  (globalThis as any).crypto?.randomUUID?.() ||
+  Math.random().toString(36).slice(2) + Date.now().toString(36);
 
-function toRad(d: number) { return d * Math.PI / 180; }
-function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
-  const R = 6371;
-  const dLat = toRad(bLat - aLat);
-  const dLng = toRad(bLng - aLng);
-  const la1 = toRad(aLat);
-  const la2 = toRad(bLat);
-  const h = Math.sin(dLat/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin(dLng/2)**2;
-  return 2 * R * Math.asin(Math.sqrt(h));
+const nowISO = () => new Date().toISOString();
+
+export const maskPhone = (p?: string) =>
+  !p ? p : p.replace(/\d(?=\d{4})/g, '*');
+
+export function safeJourney(j: Journey): Journey {
+  return { ...j, driver_phone: maskPhone(j.driver_phone) };
 }
 
-function maskPhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length <= 4) return "*".repeat(Math.max(0, digits.length - 2)) + digits.slice(-2);
-  return digits.slice(0, 2) + "****" + digits.slice(-2);
-}
-
-export function createJourney(data: Omit<Journey, "id" | "cancelled" | "reservedSeats" | "createdAt">): Journey {
+export function addJourney(data: Omit<Journey,'id'|'cancelled'|'reservedSeats'|'createdAt'>) {
   const j: Journey = {
-    id: randomUUID(),
+    id: uuid(),
     ...data,
     cancelled: false,
     reservedSeats: 0,
-    createdAt: new Date().toISOString()
+    createdAt: nowISO(),
   };
   journeys.push(j);
   return j;
@@ -41,92 +36,120 @@ export function findJourney(id: string) {
   return journeys.find(j => j.id === id);
 }
 
-export function searchJourneys(params: {
-  o_lat: number; o_lng: number; d_lat: number; d_lng: number;
-  start: number; end: number; parcel?: boolean;
-}) {
-  sweepExpiredHolds();
-  return journeys
-    .filter(j => !j.cancelled)
-    .filter(j => {
-      const startTime = Date.parse(j.startTime);
-      return startTime >= params.start && startTime <= params.end;
-    })
-    .filter(j => {
-      if (params.parcel === true && j.allow_parcels !== true) return false;
-      const oDist = haversineKm(params.o_lat, params.o_lng, j.origin.lat, j.origin.lng);
-      const dDist = haversineKm(params.d_lat, params.d_lng, j.destination.lat, j.destination.lng);
-      return oDist <= ORIGIN_DEST_MATCH_KM && dDist <= ORIGIN_DEST_MATCH_KM;
-    })
-    .map(j => ({
-      ...j,
-      driver_phone: maskPhone(j.driver_phone),
-      availableSeats: Math.max(0, j.seats - j.reservedSeats)
-    }));
-}
-
-export function createBookingHold(journeyId: string, riderName: string, seats: number): Booking | null {
-  sweepExpiredHolds();
-  const j = findJourney(journeyId);
-  if (!j || j.cancelled) return null;
-  const available = j.seats - j.reservedSeats;
-  if (seats <= 0 || seats > available) return null;
-
-  const now = new Date();
-  const b: Booking = {
-    id: randomUUID(),
-    journey_id: j.id,
-    rider_name: riderName,
-    seats,
-    status: "hold",
-    createdAt: now.toISOString(),
-    expiresAt: new Date(now.getTime() + HOLD_MINUTES * 60 * 1000).toISOString()
-  };
-  bookings.push(b);
-  j.reservedSeats += seats;
-  return b;
-}
-
-export function cancelBooking(id: string): Booking | null {
-  const b = bookings.find(x => x.id === id);
-  if (!b) return null;
-  if (b.status === "hold") {
-    const j = findJourney(b.journey_id);
-    if (j) j.reservedSeats = Math.max(0, j.reservedSeats - b.seats);
-  }
-  b.status = "cancelled";
-  return b;
-}
-
-export function cancelJourney(id: string): Journey | null {
+export function cancelJourney(id: string) {
   const j = findJourney(id);
-  if (!j) return null;
+  if (!j || j.cancelled) return null;
   j.cancelled = true;
-  // Mark holds as cancelled_by_driver and free seats
-  bookings.filter(b => b.journey_id === j.id && b.status === "hold")
-    .forEach(b => { b.status = "cancelled_by_driver"; });
-  j.reservedSeats = 0;
   return j;
 }
 
-export function sweepExpiredHolds(): void {
+export function addBooking(journey_id: string, rider_name: string, seats: number) {
+  sweepExpired();
+  const j = findJourney(journey_id);
+  if (!j || j.cancelled) throw new Error('journey_not_found');
+  if (seats < 1) throw new Error('seats_min_1');
+  const available = j.seats - j.reservedSeats;
+  if (available < seats) throw new Error('not_enough_seats');
+
+  j.reservedSeats += seats;
+  const b: Booking = {
+    id: uuid(),
+    journey_id,
+    rider_name,
+    seats,
+    status: 'hold',
+    createdAt: nowISO(),
+    expiresAt: new Date(Date.now() + HOLD_MINUTES * 60_000).toISOString(),
+  };
+  bookings.push(b);
+  return b;
+}
+
+export function cancelBooking(id: string) {
+  const b = bookings.find(x => x.id === id);
+  if (!b || b.status !== 'hold') return null;
+  b.status = 'cancelled';
+  const j = findJourney(b.journey_id);
+  if (j) j.reservedSeats = Math.max(0, j.reservedSeats - b.seats);
+  return b;
+}
+
+export function addPackageBooking(journey_id: string, payload: Omit<PackageBooking,'id'|'status'|'createdAt'|'expiresAt'|'journey_id'>) {
+  sweepExpired();
+  const j = findJourney(journey_id);
+  if (!j || j.cancelled) throw new Error('journey_not_found');
+  if (!j.allow_parcels) throw new Error('parcels_not_allowed');
+
+  const activeForJourney = packages.filter(
+    p => p.journey_id === journey_id &&
+         p.status === 'hold' &&
+         new Date(p.expiresAt).getTime() > Date.now()
+  ).length;
+  if (activeForJourney >= MAX_PARCELS_PER_JOURNEY) throw new Error('no_parcel_capacity');
+
+  const pkg: PackageBooking = {
+    id: uuid(),
+    journey_id,
+    ...payload,
+    phone: payload.phone ? maskPhone(payload.phone) : payload.phone,
+    status: 'hold',
+    createdAt: nowISO(),
+    expiresAt: new Date(Date.now() + HOLD_MINUTES * 60_000).toISOString(),
+  };
+  packages.push(pkg);
+  return pkg;
+}
+
+export function cancelPackage(id: string) {
+  const p = packages.find(x => x.id === id);
+  if (!p || p.status !== 'hold') return null;
+  p.status = 'cancelled';
+  return p;
+}
+
+export function searchJourneys(q: {
+  o_lat: number; o_lng: number; d_lat: number; d_lng: number;
+  start: string; end: string; parcel?: boolean;
+}) {
+  const within = (a: number, b: number, tol = 1.0) => Math.abs(a - b) <= tol;
+  const startMs = Date.parse(q.start), endMs = Date.parse(q.end);
+  return journeys
+    .filter(j => !j.cancelled)
+    .filter(j =>
+      within(j.origin.lat, q.o_lat) &&
+      within(j.origin.lng, q.o_lng) &&
+      within(j.destination.lat, q.d_lat) &&
+      within(j.destination.lng, q.d_lng) &&
+      Date.parse(j.startTime) >= startMs &&
+      Date.parse(j.endTime)   <= endMs &&
+      (!q.parcel || j.allow_parcels)
+    )
+    .map(safeJourney);
+}
+
+export function stats() {
+  const activeJourneys = journeys.filter(j => !j.cancelled).length;
+  const totalBookings  = bookings.length;
+  const totalPackages  = packages.length;
+  const successRate    = 0; // mock
+  return { activeJourneys, totalBookings, totalPackages, successRate };
+}
+
+export function sweepExpired() {
   const now = Date.now();
-  bookings.forEach(b => {
-    if (b.status === "hold" && Date.parse(b.expiresAt) <= now) {
-      b.status = "expired";
+  for (const b of bookings) {
+    if (b.status === 'hold' && Date.parse(b.expiresAt) <= now) {
+      b.status = 'cancelled';
       const j = findJourney(b.journey_id);
       if (j) j.reservedSeats = Math.max(0, j.reservedSeats - b.seats);
     }
-  });
+  }
+  for (const p of packages) {
+    if (p.status === 'hold' && Date.parse(p.expiresAt) <= now) {
+      p.status = 'cancelled';
+    }
+  }
 }
 
-export function getStats() {
-  sweepExpiredHolds();
-  const activeJourneys = journeys.filter(j => !j.cancelled).length;
-  const totalBookings = bookings.length;
-  const cancelled = bookings.filter(b => b.status === "cancelled" || b.status === "cancelled_by_driver").length;
-  const successRate = totalBookings === 0 ? 1 : (totalBookings - cancelled) / totalBookings;
-  return { activeJourneys, totalBookings, successRate };
-}
-
-export const store = { journeys, bookings };
+// expose raw arrays for admin/testing if needed (not exported by default)
+export const __memory = { journeys, bookings, packages };
