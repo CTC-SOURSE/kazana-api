@@ -16,7 +16,6 @@ import { Lang } from './types';
 dotenv.config();
 
 const app = express();
-app.use(/embed, express.static(public/embed, { maxAge: 1 }));
 app.set('trust proxy', 1);
 app.use(helmet());
 app.use(morgan('tiny'));
@@ -24,6 +23,8 @@ app.use(rateLimit({ windowMs: 60_000, max: 100, standardHeaders: true, legacyHea
 
 app.use(cors());
 app.use(express.json({ limit: '200kb' }));
+
+app.use("/embed", express.static("public/embed", { maxAge: "1h" }));
 
 
 // ---- i18n (en, sn, nd) ----

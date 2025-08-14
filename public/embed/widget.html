@@ -1,19 +1,24 @@
 <!doctype html>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Kazana Widget</title>
-<style>body{font-family:ui-sans-serif,system-ui;margin:0;background:#fff;color:#111}
-.wrap{max-width:980px;margin:16px auto;padding:16px;border:1px solid #eee;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
-.grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;align-items:end}
-label{font-size:12px;color:#555} input{width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:8px}
-button{border-radius:9999px;border:0;padding:10px 14px;font-weight:600;cursor:pointer}
-.primary{background:#111827;color:#fff}.secondary{background:#eef2ff;color:#1e40af}
-.row{padding:10px;border:1px solid #eee;border-radius:10px;margin:8px 0;background:#fafafa}
-pre{background:#f9fafb;padding:10px;border-radius:8px;white-space:pre-wrap}</style>
+<style>
+  body{font-family:ui-sans-serif,system-ui;margin:0;background:#fff;color:#111}
+  .wrap{max-width:980px;margin:16px auto;padding:16px;border:1px solid #eee;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+  .grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;align-items:end}
+  label{font-size:12px;color:#555}
+  input{width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:8px}
+  button{border-radius:9999px;border:0;padding:10px 14px;font-weight:600;cursor:pointer}
+  .primary{background:#111827;color:#fff}
+  .secondary{background:#eef2ff;color:#1e40af}
+  .row{padding:10px;border:1px solid #eee;border-radius:10px;margin:8px 0;background:#fafafa}
+  pre{background:#f9fafb;padding:10px;border-radius:8px;white-space:pre-wrap}
+</style>
 <div class="wrap">
   <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:12px">
     <h2 style="margin:0;font-size:18px">KAZANA (Search · Book · Package)</h2>
     <select id="lang"><option>en</option><option>sn</option><option>nd</option></select>
   </div>
+
   <div class="grid">
     <div><label>Origin lat</label><input id="o_lat" value="-17.825"></div>
     <div><label>Origin lng</label><input id="o_lng" value="31.053"></div>
@@ -23,6 +28,7 @@ pre{background:#f9fafb;padding:10px;border-radius:8px;white-space:pre-wrap}</sty
     <div style="grid-column:span 3"><label>End (ISO)</label><input id="end" value="2025-08-15T00:00:00.000Z"></div>
     <label style="display:flex;gap:6px;align-items:center"><input id="parcel" type="checkbox" checked>Allow parcels only</label>
   </div>
+
   <div style="height:8px"></div>
   <button class="primary" id="searchBtn">Search</button>
   <div style="height:12px"></div>
@@ -31,31 +37,95 @@ pre{background:#f9fafb;padding:10px;border-radius:8px;white-space:pre-wrap}</sty
   <button class="secondary" id="statsBtn">Admin stats</button>
   <pre id="log">Logs will appear here…</pre>
 </div>
+
 <script>
 (function(){
   const API_BASE = location.origin;
-  const $=id=>document.getElementById(id), log=x=>($('log').textContent=typeof x==='string'?x:JSON.stringify(x));
-  const lang=()=>$('lang').value||'en';
-  const jfetch=async(p,o={})=>{const u=API_BASE+p+(p.includes('?')?'&':'?')+'lang='+lang();const r=await fetch(u,{headers:{'Content-Type':'application/json'},...o});const d=await r.json().catch(()=>({}));if(!r.ok)throw d;return d;};
-  async function search(){ $('list').textContent='Loading…'; try{const q=new URLSearchParams({o_lat:$('o_lat').value,o_lng:$('o_lng').value,d_lat:$('d_lat').value,d_lng:$('d_lng').value,start:$('start').value,end:$('end').value,parcel:String($('parcel').checked)});const r=await jfetch('/api/search?'+q.toString()); render(r.journeys||[]); log({ok:true,count:r.count}); }catch(e){log(e)}}
-  function render(arr){ const list=$('list'); list.innerHTML=''; if(!arr.length){list.textContent='No journeys found';return;}
-    for(const j of arr){ const row=document.createElement('div'); row.className='row';
-      row.innerHTML=`<div style="font-weight:600">${j.origin?.name||''} → ${j.destination?.name||''}</div>
-      <div style="font-size:12px;color:#555">${j.startTime} → ${j.endTime} • seats left: ${j.seats-(j.reservedSeats||0)}</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-        <input placeholder="Rider name" id="r_${j.id}" style="padding:6px 8px;border:1px solid #d1d5db;border-radius:8px">
-        <input type="number" min="1" value="1" id="s_${j.id}" style="width:70px;padding:6px 8px;border:1px solid #d1d5db;border-radius:8px">
-        <button class="primary" id="b_${j.id}">Book</button>
-        <input placeholder="Sender" id="sn_${j.id}" style="padding:6px 8px;border:1px solid #d1d5db;border-radius:8px">
-        <input placeholder="+263…" id="ph_${j.id}" style="padding:6px 8px;border:1px solid #d1d5db;border-radius:8px">
-        <input placeholder="Description" id="ds_${j.id}" style="padding:6px 8px;border:1px solid #d1d5db;border-radius:8px">
-        <button class="secondary" id="p_${j.id}">Send pkg</button></div>`;
+  const $ = id => document.getElementById(id);
+  const log = x => ($('log').textContent = typeof x === 'string' ? x : JSON.stringify(x));
+  const lang = () => $('lang').value || 'en';
+  const jfetch = async (path, opts={}) => {
+    const url = API_BASE + path + (path.includes('?') ? '&' : '?') + 'lang=' + lang();
+    const r = await fetch(url, { headers:{'Content-Type':'application/json'}, ...opts });
+    const data = await r.json().catch(()=>({}));
+    if(!r.ok) throw data;
+    return data;
+  };
+
+  async function search(){
+    $('list').textContent='Loading…';
+    try {
+      const q = new URLSearchParams({
+        o_lat: $('o_lat').value, o_lng: $('o_lng').value,
+        d_lat: $('d_lat').value, d_lng: $('d_lng').value,
+        start: $('start').value, end: $('end').value,
+        parcel: String($('parcel').checked)
+      });
+      const r = await jfetch('/api/search?' + q.toString());
+      render(r.journeys || []); log({ ok:true, count:r.count });
+    } catch(e){ log(e); }
+  }
+
+  function render(arr){
+    const list = $('list'); list.innerHTML = '';
+    if(!arr.length){ list.textContent = 'No journeys found'; return; }
+    for(const j of arr){
+      const row = document.createElement('div'); row.className='row';
+      row.innerHTML = `
+        <div style="font-weight:600">${j.origin?.name||''} → ${j.destination?.name||''}</div>
+        <div style="font-size:12px;color:#555">${j.startTime} → ${j.endTime} • seats left: ${j.seats-(j.reservedSeats||0)}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+          <input placeholder="Rider name" id="r_${j.id}" style="padding:6px 8px;border:1px solid #d1d5db;border-radius:8px">
+          <input type="number" min="1" value="1" id="s_${j.id}" style="width:70px;padding:6px 8px;border:1px solid #d1d5db;border-radius:8px">
+          <button class="primary" id="b_${j.id}">Book</button>
+
+          <input placeholder="Sender" id="sn_${j.id}" style="padding:6px 8px;border:1px solid #d1d5db;border-radius:8px">
+          <input placeholder="Recipient" id="rc_${j.id}" style="padding:6px 8px;border:1px solid #d1d5db;border-radius:8px">
+          <input placeholder="+263…" id="ph_${j.id}" style="padding:6px 8px;border:1px solid #d1d5db;border-radius:8px">
+          <input placeholder="Weight kg" id="wt_${j.id}" type="number" min="0" step="0.1" style="width:110px;padding:6px 8px;border:1px solid #d1d5db;border-radius:8px">
+          <input placeholder="Description" id="ds_${j.id}" style="padding:6px 8px;border:1px solid #d1d5db;border-radius:8px">
+          <button class="secondary" id="p_${j.id}">Send pkg</button>
+        </div>`;
       list.append(row);
-      document.getElementById('b_'+j.id).onclick=async()=>{try{log(await jfetch('/api/bookings',{method:'POST',body:JSON.stringify({journey_id:j.id,rider_name:document.getElementById('r_'+j.id).value||'Guest',seats:Number(document.getElementById('s_'+j.id).value||1)})}))}catch(e){log(e)}};
-      document.getElementById('p_'+j.id).onclick=async()=>{try{log(await jfetch('/api/packages',{method:'POST',body:JSON.stringify({journey_id:j.id,sender_name:document.getElementById('sn_'+j.id).value||'Sender',phone:document.getElementById('ph_'+j.id).value||'',description:document.getElementById('ds_'+j.id).value||''})}))}catch(e){log(e)}};
-    }}
-  async function stats(){try{log(await jfetch('/api/admin/stats'))}catch(e){log(e)}}
-  async function health(){try{log(await jfetch('/health'))}catch(e){log(e)}}
-  document.getElementById('searchBtn').onclick=search; document.getElementById('statsBtn').onclick=stats; health();
+
+      $('b_'+j.id).onclick = async () => {
+        try {
+          const r = await jfetch('/api/bookings', {
+            method:'POST',
+            body: JSON.stringify({
+              journey_id: j.id,
+              rider_name: $('r_'+j.id).value || 'Guest',
+              seats: Number($('s_'+j.id).value || 1)
+            })
+          });
+          log(r);
+        } catch(e){ log(e); }
+      };
+
+      $('p_'+j.id).onclick = async () => {
+        try {
+          const r = await jfetch('/api/packages', {
+            method:'POST',
+            body: JSON.stringify({
+              journey_id: j.id,
+              sender_name: $('sn_'+j.id).value || 'Sender',
+              recipient_name: $('rc_'+j.id).value || 'Recipient',
+              phone: $('ph_'+j.id).value || '',
+              description: $('ds_'+j.id).value || '',
+              weight_kg: parseFloat($('wt_'+j.id).value || '0')
+            })
+          });
+          log(r);
+        } catch(e){ log(e); }
+      };
+    }
+  }
+
+  async function stats(){ try{ log(await jfetch('/api/admin/stats')); }catch(e){ log(e); } }
+  async function health(){ try{ log(await jfetch('/health')); }catch(e){ log(e); } }
+
+  $('searchBtn').onclick = search;
+  $('statsBtn').onclick  = stats;
+  health();
 })();
 </script>
