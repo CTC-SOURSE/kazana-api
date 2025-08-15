@@ -1,3 +1,5 @@
+import csp from "./middleware/csp";
+import cancelRoutes from "./routes/cancel";
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -16,6 +18,9 @@ import { Lang } from './types';
 dotenv.config();
 
 const app = express();
+app.use(csp);
+app.use(cancelRoutes);
+
 app.set('trust proxy', 1);
 app.use(helmet());
 app.use(morgan('tiny'));
