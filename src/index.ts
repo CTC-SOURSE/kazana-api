@@ -205,3 +205,5 @@ app.use((req,_res,next)=>{ console.log(`[${new Date().toISOString()}]`, req.meth
 app.get('/healthz', (_req,res)=>res.send('ok'));
 
 app.use("/api", waRoutes);
+
+app.use(waRoutes);
