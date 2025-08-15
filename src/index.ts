@@ -198,3 +198,7 @@ app.get('/api/admin/stats', (_req, res) => res.json({ ok:true, ...stats() }));
 
 const PORT = Number(process.env.PORT || 5000);
 app.listen(PORT, () => console.log(`KAZANA API running on http://localhost:${PORT}`));
+
+/* === basic ops === */
+app.use((req,_res,next)=>{ console.log(`[${new Date().toISOString()}]`, req.method, req.path); next(); });
+app.get('/healthz', (_req,res)=>res.send('ok'));
