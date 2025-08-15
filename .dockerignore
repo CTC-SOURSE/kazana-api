@@ -1,18 +1,9 @@
-# common junk to skip
 node_modules
-dist
+npm-debug.log
 .git
 .gitignore
-*.log
-npm-debug.log*
-.DS_Store
-.nixpacks
-.nixpacks.toml
+dist
 .env
 .env.*
-
-# do NOT ignore the manifests/lockfiles
-!package.json
-!package-lock.json
-!pnpm-lock.yaml
-!bun.lockb
+Dockerfile
+.dockerignore
