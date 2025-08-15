@@ -225,3 +225,25 @@ app.get('/embed/widget.html', (_req, res) => {
   );
   res.sendFile(WIDGET_FILE);
 });
+
+// ---------- Health/ping for Railway ----------
+app.get('/', (_req, res) => res.status(200).send('ok'));
+app.get('/health', (_req, res) => res.status(200).send('ok'));
+
+// ---------- Explicit CSP for the embed widget ----------
+const WIDGET_FILE = path.resolve(__dirname, '../public/embed/widget.html');
+app.get('/embed/widget.html', (_req, res) => {
+  // allow lovable + localhost to embed
+  res.removeHeader('X-Frame-Options');
+  res.setHeader('Content-Security-Policy',
+    "frame-ancestors 'self' https://*.lovableproject.com https://*.lovable.dev http://localhost:5173; " +
+    "base-uri 'self'; upgrade-insecure-requests"
+  );
+  res.sendFile(WIDGET_FILE);
+});
+
+// ---------- Listen on Railway PORT ----------
+const PORT = Number(process.env.PORT || 8080);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`KAZANA API listening on :${PORT}`);
+});
