@@ -1,3 +1,4 @@
+import waRoutes from "./routes/wa";
 import csp from "./middleware/csp";
 import cancelRoutes from "./routes/cancel";
 import express from 'express';
@@ -202,3 +203,5 @@ app.listen(PORT, () => console.log(`KAZANA API running on http://localhost:${POR
 /* === basic ops === */
 app.use((req,_res,next)=>{ console.log(`[${new Date().toISOString()}]`, req.method, req.path); next(); });
 app.get('/healthz', (_req,res)=>res.send('ok'));
+
+app.use(waRoutes);
