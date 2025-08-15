@@ -14,9 +14,8 @@ RUN npm ci --omit=dev --no-audit --no-fund --ignore-scripts
 
 # 3) Copy the source now
 COPY src ./src
-COPY public ./public 2>/dev/null || true
-COPY embed ./embed 2>/dev/null || true
-COPY .env.example ./.env.example 2>/dev/null || true
+COPY public ./public
+COPY .env.example ./.env.example
 
 # 4) Build TS now (tsconfig.json is present)
 RUN npm run build
