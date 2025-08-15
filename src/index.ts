@@ -204,4 +204,4 @@ app.listen(PORT, () => console.log(`KAZANA API running on http://localhost:${POR
 app.use((req,_res,next)=>{ console.log(`[${new Date().toISOString()}]`, req.method, req.path); next(); });
 app.get('/healthz', (_req,res)=>res.send('ok'));
 
-app.use(waRoutes);
+app.use("/api", waRoutes);
