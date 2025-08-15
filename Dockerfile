@@ -1,13 +1,29 @@
+# Use Node 20 (small image)
 FROM node:20-alpine
 
-ENV NODE_ENV=production
+# App folder
 WORKDIR /app
 
+# 1) Copy only manifests + tsconfig first (needed if scripts reference it)
 COPY package*.json ./
-RUN npm install --omit=dev --no-audit --no-fund || npm install --no-audit --no-fund
+COPY tsconfig.json ./  # keep this line; it prevents tsc/prepare from failing
 
-COPY . .
+# 2) Install production deps WITHOUT running lifecycle scripts
+#    (postinstall/prepare won’t run here)
+RUN npm ci --omit=dev --no-audit --no-fund --ignore-scripts
+
+# 3) Copy the source now
+COPY src ./src
+COPY public ./public 2>/dev/null || true
+COPY embed ./embed 2>/dev/null || true
+COPY .env.example ./.env.example 2>/dev/null || true
+
+# 4) Build TS now (tsconfig.json is present)
 RUN npm run build
 
+# 5) Runtime config
+ENV NODE_ENV=production
+ENV PORT=8080
 EXPOSE 8080
+
 CMD ["node", "dist/index.js"]
