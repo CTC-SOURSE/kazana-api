@@ -21,7 +21,8 @@ export const messages: Record<Lang, Record<string, string>> = {
     myPosts: 'My posts',
     navBookSend: 'Book & Send',
     navAdmin: 'Admin',
-    demoAs: 'Demo as'
+    demoAs: 'Demo as',
+    cancel: 'Cancel'
   },
   sn: {
     title: 'Bhuka & Tumira',
@@ -41,7 +42,8 @@ export const messages: Record<Lang, Record<string, string>> = {
     myPosts: 'Zvandakaisa',
     navBookSend: 'Bhuka & Tumira',
     navAdmin: 'Admin',
-    demoAs: 'Ratidza se'
+    demoAs: 'Ratidza se',
+    cancel: 'Kanzura'
   },
   nd: {
     title: 'Bhuka & Thumela',
@@ -61,7 +63,8 @@ export const messages: Record<Lang, Record<string, string>> = {
     myPosts: 'Okuthunyelwe kwami',
     navBookSend: 'Bhuka & Thumela',
     navAdmin: 'Admin',
-    demoAs: 'Bonisa njengokuthi'
+    demoAs: 'Bonisa njengokuthi',
+    cancel: 'Khansela'
   }
 };
 
