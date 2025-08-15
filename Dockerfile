@@ -1,4 +1,5 @@
 # Use Node 20 (small image)
+ARG REBUILD_TS=1755254250
 FROM node:20-alpine
 
 # App folder
