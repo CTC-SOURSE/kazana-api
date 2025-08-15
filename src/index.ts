@@ -198,8 +198,8 @@ app.delete('/api/journeys/:id', (req, res) => {
 // ---- Admin ----
 app.get('/api/admin/stats', (_req, res) => res.json({ ok:true, ...stats() }));
 
-const PORT = Number(process.env.PORT || 5000);
-app.listen(PORT, () => console.log(`KAZANA API running on http://localhost:${PORT}`));
+const SERVER_PORT = Number(process.env.PORT || 5000);
+app.listen(SERVER_PORT, () => console.log(`KAZANA API running on http://localhost:${PORT}`));
 
 /* === basic ops === */
 app.use((req,_res,next)=>{ console.log(`[${new Date().toISOString()}]`, req.method, req.path); next(); });
@@ -210,7 +210,6 @@ app.use("/api", waRoutes);
 app.use(waRoutes);
 
 // === Explicit CSP for widget embed (Lovable / localhost) ===
-const WIDGET_FILE = path.resolve(__dirname, '../public/embed/widget.html');
 
 app.get('/embed/widget.html', (_req, res) => {
   // allow lovable + localhost to embed
@@ -223,7 +222,7 @@ app.get('/embed/widget.html', (_req, res) => {
       "upgrade-insecure-requests"
     ].join('; ')
   );
-  res.sendFile(WIDGET_FILE);
+  res.sendFile(path.resolve(__dirname, '../public/embed/widget.html'));
 });
 
 // ---------- Health/ping for Railway ----------
@@ -231,7 +230,6 @@ app.get('/', (_req, res) => res.status(200).send('ok'));
 app.get('/health', (_req, res) => res.status(200).send('ok'));
 
 // ---------- Explicit CSP for the embed widget ----------
-const WIDGET_FILE = path.resolve(__dirname, '../public/embed/widget.html');
 app.get('/embed/widget.html', (_req, res) => {
   // allow lovable + localhost to embed
   res.removeHeader('X-Frame-Options');
@@ -239,11 +237,11 @@ app.get('/embed/widget.html', (_req, res) => {
     "frame-ancestors 'self' https://*.lovableproject.com https://*.lovable.dev http://localhost:5173; " +
     "base-uri 'self'; upgrade-insecure-requests"
   );
-  res.sendFile(WIDGET_FILE);
+  res.sendFile(path.resolve(__dirname, '../public/embed/widget.html'));
 });
 
 // ---------- Listen on Railway PORT ----------
-const PORT = Number(process.env.PORT || 8080);
-app.listen(PORT, '0.0.0.0', () => {
+const SERVER_PORT = Number(process.env.PORT || 8080);
+app.listen(SERVER_PORT, '0.0.0.0', () => {
   console.log(`KAZANA API listening on :${PORT}`);
 });
