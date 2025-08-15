@@ -1,7 +1,7 @@
 import { Router } from 'express';
 const r = Router();
 
-r.post('/api/notify/whatsapp', async (req, res) => {
+r.post('/notify/whatsapp', async (req, res) => {
   try {
     const { to, text } = req.body || {};
     if (!to || !text) return res.status(400).json({ ok:false, error:'missing to/text' });
