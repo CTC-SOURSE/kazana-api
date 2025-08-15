@@ -1,29 +1,30 @@
-# Use Node 20 (small image)
-ARG REBUILD_TS=1755254250
-FROM node:20-alpine
+# syntax=docker/dockerfile:1
 
-# App folder
+# Use AWS' public mirror of the Node image to avoid Docker Hub rate/availability issues
+FROM public.ecr.aws/docker/library/node:20-alpine AS deps
 WORKDIR /app
 
-# 1) Copy only manifests + tsconfig first (needed if scripts reference it)
-COPY package.json package-lock.json ./
-COPY tsconfig.json ./  # keep this line; it prevents tsc/prepare from failing
+# Install full deps (incl. dev) to build
+COPY package*.json ./
+RUN npm ci --no-audit --no-fund
 
-# 2) Install production deps WITHOUT running lifecycle scripts
-#    (postinstall/prepare won’t run here)
-RUN npm ci --omit=dev --no-audit --no-fund --ignore-scripts
-
-# 3) Copy the source now
-COPY src ./src
-COPY public ./public
-COPY .env.example ./.env.example
-
-# 4) Build TS now (tsconfig.json is present)
+# ---- Build stage ----
+FROM deps AS builder
+WORKDIR /app
+COPY . .
+# Build TypeScript to /dist
 RUN npm run build
 
-# 5) Runtime config
-ENV NODE_ENV=production
-ENV PORT=8080
-EXPOSE 8080
+# ---- Runtime stage ----
+FROM public.ecr.aws/docker/library/node:20-alpine AS runner
+WORKDIR /app
 
+ENV NODE_ENV=production
+# Only runtime deps
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+COPY package*.json ./
+
+# If your server uses 8080, leave this; otherwise change it
+EXPOSE 8080
 CMD ["node", "dist/index.js"]
