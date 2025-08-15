@@ -5,7 +5,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 # 1) Copy only manifests + tsconfig first (needed if scripts reference it)
-COPY package*.json ./
+COPY package.json package-lock.json ./
 COPY tsconfig.json ./  # keep this line; it prevents tsc/prepare from failing
 
 # 2) Install production deps WITHOUT running lifecycle scripts
