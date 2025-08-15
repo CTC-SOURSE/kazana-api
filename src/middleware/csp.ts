@@ -1,12 +1,13 @@
 import type { Request, Response, NextFunction } from 'express';
-
 export default function csp(_req: Request, res: Response, next: NextFunction) {
-  // allow Lovable preview + local dev to embed the widget
   res.setHeader(
     'Content-Security-Policy',
-    "frame-ancestors 'self' https://*.lovable.dev http://localhost:5173"
+    [
+      "frame-ancestors 'self' https://*.lovable.dev https://*.lovableproject.com http://localhost:5173",
+      "base-uri 'self'",
+      "upgrade-insecure-requests"
+    ].join('; ')
   );
-  // avoid older headers blocking if present
   res.removeHeader('X-Frame-Options');
   next();
 }

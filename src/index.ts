@@ -1,3 +1,4 @@
+import path from 'path';
 import waRoutes from "./routes/wa";
 import csp from "./middleware/csp";
 import cancelRoutes from "./routes/cancel";
@@ -207,3 +208,20 @@ app.get('/healthz', (_req,res)=>res.send('ok'));
 app.use("/api", waRoutes);
 
 app.use(waRoutes);
+
+// === Explicit CSP for widget embed (Lovable / localhost) ===
+const WIDGET_FILE = path.resolve(__dirname, '../public/embed/widget.html');
+
+app.get('/embed/widget.html', (_req, res) => {
+  // allow lovable + localhost to embed
+  res.removeHeader('X-Frame-Options');
+  res.setHeader(
+    'Content-Security-Policy',
+    [
+      "frame-ancestors 'self' https://*.lovableproject.com https://*.lovable.dev http://localhost:5173",
+      "base-uri 'self'",
+      "upgrade-insecure-requests"
+    ].join('; ')
+  );
+  res.sendFile(WIDGET_FILE);
+});

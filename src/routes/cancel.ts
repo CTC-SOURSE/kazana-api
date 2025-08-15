@@ -1,29 +1,19 @@
 import { Router } from 'express';
-
 const r = Router();
 
-// Rider cancels booking
-r.delete('/api/bookings/:id', (req, res) => {
-  const { id } = req.params;
-  // TODO: hook to real cancel logic
-  return res.status(200).json({ ok: true, id, action: 'booking.delete' });
-});
-r.post('/api/bookings/:id/cancel', (req, res) => {
-  const { id } = req.params;
-  // TODO: hook to real cancel logic
-  return res.status(200).json({ ok: true, id, action: 'booking.cancel' });
-});
+function ok(res:any, id:string, action:string) {
+  return res.status(200).json({ ok:true, id, action });
+}
 
-// Driver cancels posted journey
-r.delete('/api/driver/journeys/:id', (req, res) => {
-  const { id } = req.params;
-  // TODO: hook to real cancel logic
-  return res.status(200).json({ ok: true, id, action: 'journey.delete' });
-});
-r.post('/api/driver/journeys/:id/cancel', (req, res) => {
-  const { id } = req.params;
-  // TODO: hook to real cancel logic
-  return res.status(200).json({ ok: true, id, action: 'journey.cancel' });
-});
+/* Rider booking cancel (both verbs) */
+r.delete('/api/bookings/:id', (req, res) => ok(res, req.params.id, 'booking.delete'));
+r.post('/api/bookings/:id/cancel', (req, res) => ok(res, req.params.id, 'booking.cancel'));
+
+/* Driver journey/trip cancel – accept both route shapes used by the UI */
+r.delete('/api/driver/journeys/:id', (req, res) => ok(res, req.params.id, 'journey.delete'));
+r.post('/api/driver/journeys/:id/cancel', (req, res) => ok(res, req.params.id, 'journey.cancel'));
+
+r.delete('/api/driver/trips/:id', (req, res) => ok(res, req.params.id, 'trip.delete'));
+r.post('/api/driver/trips/:id/cancel', (req, res) => ok(res, req.params.id, 'trip.cancel'));
 
 export default r;
