@@ -202,3 +202,13 @@ const PORT: number = Number(process.env.PORT) || 8080;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`KAZANA API listening on :${PORT}`);
 });
+
+// --- Allow Lovable to embed the widget only ---
+app.get('/embed/widget.html', (_req, res) => {
+  res.removeHeader('X-Frame-Options');
+  res.setHeader(
+    'Content-Security-Policy',
+    "frame-ancestors 'self' https://*.lovableproject.com https://*.lovable.dev http://localhost:5173; base-uri 'self'; upgrade-insecure-requests"
+  );
+  res.sendFile(path.resolve(__dirname, '../public/embed/widget.html'));
+});
