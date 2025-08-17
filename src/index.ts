@@ -197,51 +197,6 @@ app.delete('/api/journeys/:id', (req, res) => {
 
 // ---- Admin ----
 app.get('/api/admin/stats', (_req, res) => res.json({ ok:true, ...stats() }));
-
-
-/* === basic ops === */
-app.use((req,_res,next)=>{ console.log(`[${new Date().toISOString()}]`, req.method, req.path); next(); });
-app.get('/healthz', (_req,res)=>res.send('ok'));
-
-app.use("/api", waRoutes);
-
-app.use(waRoutes);
-
-// === Explicit CSP for widget embed (Lovable / localhost) ===
-
-app.get('/embed/widget.html', (_req, res) => {
-  // allow lovable + localhost to embed
-  res.removeHeader('X-Frame-Options');
-  res.setHeader(
-    'Content-Security-Policy',
-    [
-      "frame-ancestors 'self' https://*.lovableproject.com https://*.lovable.dev http://localhost:5173",
-      "base-uri 'self'",
-      "upgrade-insecure-requests"
-    ].join('; ')
-  );
-  res.sendFile(path.resolve(__dirname, '../public/embed/widget.html'));
-});
-
-// ---------- Health/ping for Railway ----------
-app.get('/', (_req, res) => res.status(200).send('ok'));
-app.get('/health', (_req, res) => res.status(200).send('ok'));
-
-// ---------- Explicit CSP for the embed widget ----------
-app.get('/embed/widget.html', (_req, res) => {
-  // allow lovable + localhost to embed
-  res.removeHeader('X-Frame-Options');
-  res.setHeader('Content-Security-Policy',
-    "frame-ancestors 'self' https://*.lovableproject.com https://*.lovable.dev http://localhost:5173; " +
-    "base-uri 'self'; upgrade-insecure-requests"
-  );
-  res.sendFile(path.resolve(__dirname, '../public/embed/widget.html'));
-});
-
-// ---------- Listen on Railway PORT ----------
-  console.log(`KAZANA API listening on :${PORT}`);
-});
-
 /* === normalized server listener === */
 const PORT: number = Number(process.env.PORT) || 8080;
 app.listen(PORT, '0.0.0.0', () => {
