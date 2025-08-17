@@ -1,7 +1,0 @@
-.git
-node_modules
-dist
-Dockerfile
-**/*.log
-**/*.test.*
-**/__tests__/
