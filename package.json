@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "KAZANA ride-share minimal REST API",
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "main": "dist/index.js",
   "scripts": {
