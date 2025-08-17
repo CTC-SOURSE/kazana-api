@@ -198,8 +198,6 @@ app.delete('/api/journeys/:id', (req, res) => {
 // ---- Admin ----
 app.get('/api/admin/stats', (_req, res) => res.json({ ok:true, ...stats() }));
 
-const SERVER_PORT = Number(process.env.PORT || 5000);
-app.listen(SERVER_PORT, () => console.log(`KAZANA API running on http://localhost:${PORT}`));
 
 /* === basic ops === */
 app.use((req,_res,next)=>{ console.log(`[${new Date().toISOString()}]`, req.method, req.path); next(); });
@@ -241,7 +239,11 @@ app.get('/embed/widget.html', (_req, res) => {
 });
 
 // ---------- Listen on Railway PORT ----------
-const SERVER_PORT = Number(process.env.PORT || 8080);
-app.listen(SERVER_PORT, '0.0.0.0', () => {
+  console.log(`KAZANA API listening on :${PORT}`);
+});
+
+/* === normalized server listener === */
+const PORT: number = Number(process.env.PORT) || 8080;
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`KAZANA API listening on :${PORT}`);
 });
