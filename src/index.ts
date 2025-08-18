@@ -1,3 +1,4 @@
+import learnRouter from './routes/learn';
 import matchRouter from './routes/match';
 import path from 'path';
 import waRoutes from "./routes/wa";
@@ -230,6 +231,8 @@ app.get("/embed/widget.html", (_req, res) => {
   );
   res.sendFile(path.resolve(__dirname, "../public/embed/widget.html"));
 });
+app.use('/api', matchRouter);
+app.use('/api', learnRouter);
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`KAZANA API listening on :${PORT}`);
 });
