@@ -36,6 +36,15 @@ app.get("/embed/widget.html", (_req, res) => {
   res.sendFile(path.resolve(__dirname, "../public/embed/widget.html"));
 });
 
+// Allow Lovable to embed the widget
+app.get("/embed/widget.html", (_req, res) => {
+  res.removeHeader("X-Frame-Options");
+  res.setHeader("X-Frame-Options", "");
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Content-Security-Policy", "frame-ancestors 'self' https://*.lovableproject.com https://*.lovable.dev http://localhost:5173; base-uri 'self'; upgrade-insecure-requests");
+  res.sendFile(path.resolve(__dirname, "../public/embed/widget.html"));
+});
+
 app.use(helmet({ frameguard: false }));
 app.use(morgan('tiny'));
 app.use(rateLimit({ windowMs: 60_000, max: 100, standardHeaders: true, legacyHeaders: false }));
