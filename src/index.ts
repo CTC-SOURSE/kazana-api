@@ -199,6 +199,15 @@ app.delete('/api/journeys/:id', (req, res) => {
 app.get('/api/admin/stats', (_req, res) => res.json({ ok:true, ...stats() }));
 /* === normalized server listener === */
 const PORT: number = Number(process.env.PORT) || 8080;
+// --- Allow Lovable to embed the widget only ---
+app.get("/embed/widget.html", (_req, res) => {
+  res.removeHeader("X-Frame-Options");
+  res.setHeader(
+    "Content-Security-Policy",
+    "frame-ancestors 'self' https://*.lovableproject.com https://*.lovable.dev http://localhost:5173; base-uri 'self'; upgrade-insecure-requests"
+  );
+  res.sendFile(path.resolve(__dirname, "../public/embed/widget.html"));
+});
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`KAZANA API listening on :${PORT}`);
 });
