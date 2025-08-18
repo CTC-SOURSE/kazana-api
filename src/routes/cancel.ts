@@ -1,19 +1,15 @@
 import { Router } from 'express';
-const r = Router();
+const router = Router();
 
-function ok(res:any, id:string, action:string) {
-  return res.status(200).json({ ok:true, id, action });
-}
+// Driver cancels a posted trip
+router.post('/driver/trips/:id/cancel', (req, res) => {
+  // TODO: enforce your business rules; for now just 200 OK to unblock UI
+  res.json({ ok:true, tripId: req.params.id, status:'cancelled' });
+});
 
-/* Rider booking cancel (both verbs) */
-r.delete('/api/bookings/:id', (req, res) => ok(res, req.params.id, 'booking.delete'));
-r.post('/api/bookings/:id/cancel', (req, res) => ok(res, req.params.id, 'booking.cancel'));
+// Rider cancels a booking
+router.post('/bookings/:id/cancel', (req, res) => {
+  res.json({ ok:true, bookingId: req.params.id, status:'cancelled' });
+});
 
-/* Driver journey/trip cancel – accept both route shapes used by the UI */
-r.delete('/api/driver/journeys/:id', (req, res) => ok(res, req.params.id, 'journey.delete'));
-r.post('/api/driver/journeys/:id/cancel', (req, res) => ok(res, req.params.id, 'journey.cancel'));
-
-r.delete('/api/driver/trips/:id', (req, res) => ok(res, req.params.id, 'trip.delete'));
-r.post('/api/driver/trips/:id/cancel', (req, res) => ok(res, req.params.id, 'trip.cancel'));
-
-export default r;
+export default router;
