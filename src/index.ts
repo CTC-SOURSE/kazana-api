@@ -1,3 +1,4 @@
+import matchRouter from './routes/match';
 import path from 'path';
 import waRoutes from "./routes/wa";
 import csp from "./middleware/csp";
